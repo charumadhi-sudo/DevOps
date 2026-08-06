@@ -21,3 +21,18 @@ This lab serves the Boston Housing model using FastAPI and Docker.
    ```bash
    docker run -d -p 8000:8000 boston-housing-app
    ```
+
+## How to push to Docker Hub
+1. Login to Docker Hub:
+   ```bash
+   docker login
+   ```
+2. Tag your image (replace `<username>` with your Docker Hub username):
+   ```bash
+   docker tag boston-housing-app <username>/boston-housing-app:latest
+   ```
+3. Push to your Docker Hub repository:
+   ```bash
+   docker push <username>/boston-housing-app:latest
+   ```
+
