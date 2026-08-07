@@ -5,3 +5,5 @@ scikit-learn==1.8.0
 jinja2
 numpy
 pandas
+pyyaml
+huggingface_hub

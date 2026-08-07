@@ -1,0 +1,100 @@
+name: MLOps CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+# All pipeline files live in the Lab_5/ subfolder, so every job runs from there.
+defaults:
+  run:
+    working-directory: Lab_5
+
+jobs:
+  # Runs on every PR and push: quick sanity checks, no deployment.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: Lab_5/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Unit tests
+        run: pytest tests/ -v
+
+  # Runs the actual pipeline: prepare data -> train -> evaluate.
+  # If evaluate.py exits non-zero (accuracy below the gate in params.yaml),
+  # this job fails and deploy never runs.
+  train_and_evaluate:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: Lab_5/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Prepare data
+        run: python src/prepare.py
+
+      - name: Train model
+        run: python src/train.py
+
+      - name: Evaluate model (quality gate)
+        run: python src/evaluate.py
+
+      - name: Upload model + metrics as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-and-metrics
+          path: |
+            Lab_5/model/
+            Lab_5/metrics.json
+
+  # Only on push to main, only after train_and_evaluate passed the gate.
+  deploy_to_huggingface:
+    needs: train_and_evaluate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: Lab_5/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Re-run rather than download the artifact, so the model that gets
+      # deployed is guaranteed fresh and reproducible from this exact commit.
+      - name: Prepare, train, evaluate
+        run: |
+          python src/prepare.py
+          python src/train.py
+          python src/evaluate.py
+
+      - name: Push model to Hugging Face Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID }}
+        run: python src/register.py
