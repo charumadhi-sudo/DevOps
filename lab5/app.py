@@ -37,7 +37,7 @@ class HouseFeatures(BaseModel):
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     # Render and serve the index.html front-end
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 @app.get("/health")
 def health():
