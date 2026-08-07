@@ -1,13 +1,18 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import joblib
 import json
 import os
 
+# Base directory for relative paths
+base_dir = os.path.dirname(__file__)
+
 # Load model and scaler
-model_path = os.path.join(os.path.dirname(__file__), "model.pkl")
-scaler_path = os.path.join(os.path.dirname(__file__), "scaler.pkl")
-metrics_path = os.path.join(os.path.dirname(__file__), "metrics.json")
+model_path = os.path.join(base_dir, "model.pkl")
+scaler_path = os.path.join(base_dir, "scaler.pkl")
+metrics_path = os.path.join(base_dir, "metrics.json")
 
 model = joblib.load(model_path)
 scaler = joblib.load(scaler_path)
@@ -16,22 +21,23 @@ scaler = joblib.load(scaler_path)
 with open(metrics_path, "r") as f:
     model_metrics = json.load(f)
 
+# Initialize FastAPI app
 app = FastAPI(
     title="Boston Housing Regression API - Lab 5",
     description="MLOps API for predicting house prices using the Boston dataset",
     version="1.0"
 )
 
+# Configure Jinja2 templates
+templates = Jinja2Templates(directory=os.path.join(base_dir, "templates"))
+
 class HouseFeatures(BaseModel):
     features: list[float]
 
-@app.get("/")
-def home():
-    return {
-        "message": "Boston Housing Regression API (Lab 5) is running!",
-        "metrics": model_metrics,
-        "docs": "/docs"
-    }
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request):
+    # Render and serve the index.html front-end
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/health")
 def health():
